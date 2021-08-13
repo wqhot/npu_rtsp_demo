@@ -47,7 +47,7 @@
 
    ```shell
    # 全功能正常运行
-   gltest rtsp://192.168.50.203/live/av0
+   gltest --source rtsp://192.168.50.203/live/av0
    # 功能关闭选项
    # --nouse_npu: 加入此选项后，将不会进行目标检测的工作，npu不会工作。卸载npu的驱动同样可以达到相同的效果
    # --nouse_rtsp: 加入此选项后，将不使用显卡进行解码，使用测试图像(./video/0750.bmp)进行目标检测
