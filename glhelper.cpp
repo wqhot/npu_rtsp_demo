@@ -1,4 +1,6 @@
 #include "glhelper.h"
+#include <glog/logging.h>
+
 GLHelper::GLHelper()
 {
     init_gl();
@@ -28,7 +30,7 @@ void GLHelper::register_item(int item_num, std::vector<gl_item_info> &tex_info)
     tex_name_.resize(item_num);
     tex_data_.resize(item_num);
     tex_ptr_.resize(item_num);
-    tex_gpu_.resize(item_num);
+    tex_gpu_.resize(item_num, nullptr);
     need_refresh_.resize(item_num, true);
     glGenTextures(item_num, tex_name_.data());
 
@@ -142,7 +144,7 @@ void GLHelper::paint_gl()
                 continue;
             }
             // 无需刷新时
-            if (need_refresh_[i] == 1)
+            if (need_refresh_[i] == true)
             {
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex_info_[i].w,
                              tex_info_[i].h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
@@ -156,7 +158,7 @@ void GLHelper::paint_gl()
         else if (tex_info_[i].type == TEX_GPU)
         {
             need_refresh_[i] = 1;
-            if (*(tex_gpu_[i]))
+            if ((tex_gpu_[i]) != nullptr)
             {
                 void *rgbaAddr = jmgpuVideoBufferGetFbAddr(*(tex_gpu_[i]));
                 glTexImage2D(GL_TEXTURE_2D, 0, 0,
@@ -197,4 +199,5 @@ void GLHelper::paint_gl()
     fps = 0.8 * fps + 0.2 * 1.0 / (now_stamp - last_stamp);
     last_stamp = now_stamp;
     printf(" fps = %f\n", fps);
+    LOG(INFO) << "fps = " << fps;
 }

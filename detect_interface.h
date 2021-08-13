@@ -6,6 +6,7 @@
 #include <opencv4/opencv2/opencv.hpp>
 #include <type_define.h>
 #include <functional>
+#include <glog/logging.h>
 
 typedef std::function<void(cv::Mat &)> callback_func;
 class JSSDetectInterface
@@ -21,6 +22,7 @@ private:
     int detect_callback(std::vector<detectBox> &detect_msg)
     {
         printf("there are %ld detect box in last image.\n", detect_msg.size());
+        LOG(INFO) << "there are " << detect_msg.size() << " detect box in last image";
         // 处理识别内容
         cv::Mat img(cv::Size(1920, 1080), CV_MAKE_TYPE(8, 4), cv::Scalar(0));
         for (auto &box : detect_msg)
