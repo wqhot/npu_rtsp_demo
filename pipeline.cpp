@@ -8,6 +8,44 @@ DECLARE_bool(use_rtsp);
 DECLARE_bool(use_rtsp_for_npu);
 DECLARE_bool(display_rtsp);
 DECLARE_bool(display_detect);
+DECLARE_bool(blend_more);
+
+static std::vector<unsigned char> img_data;
+#define checkImageWidth1 1920
+#define checkImageHeight1 64
+#define checkImageWidth2 64
+#define checkImageHeight2 1080
+
+static GLubyte otherImage[checkImageHeight1][checkImageWidth1][4];
+static GLubyte otherImage2[checkImageHeight2][checkImageWidth2][4];
+
+void makeCheckImages(void)
+{
+    int i, j, c;
+
+    for (i = 0; i < checkImageHeight1; i++)
+    {
+        for (j = 0; j < checkImageWidth1; j++)
+        {
+            c = ((((i & 0x10) == 0) ^ ((j & 0x10)) == 0)) * 255;
+            otherImage[i][j][0] = (GLubyte)0;
+            otherImage[i][j][1] = (GLubyte)0;
+            otherImage[i][j][2] = (GLubyte)c;
+            otherImage[i][j][3] = (GLubyte)c;
+        }
+    }
+    for (i = 0; i < checkImageHeight2; i++)
+    {
+        for (j = 0; j < checkImageWidth2; j++)
+        {
+            c = ((((i & 0x10) == 0) ^ ((j & 0x10)) == 0)) * 255;
+            otherImage2[i][j][0] = (GLubyte)c;
+            otherImage2[i][j][1] = (GLubyte)0;
+            otherImage2[i][j][2] = (GLubyte)0;
+            otherImage2[i][j][3] = (GLubyte)c;
+        }
+    }
+}
 
 Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_helper)
     //加载目标检测模型文件，绑定回调函数
@@ -20,7 +58,7 @@ Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_hel
     {
         rgbaQueue = jmgpuConcurrentQueueCreate();
         context = jmgpuMediaContextCreate();
-        decoder = decodeCreate(context, cols, rows, 66);
+        decoder = decodeCreate(context);
         decodeStart(decoder);
     }
     url = camera_address;
@@ -33,6 +71,15 @@ Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_hel
     item_info.push_back({1920, 1080, -1, -1, 1, 1, TEX_GPU});
     // 图层1为目标检测结果图层，纹理类型为opencv图像
     item_info.push_back({1920, 1080, -1, -1, 1, 1, TEX_MAT});
+
+    if (FLAGS_blend_more)
+    {
+        makeCheckImages();
+        item_info.push_back({checkImageWidth1, checkImageHeight1, -1, -1, 1, -0.9375, TEX_MAT});
+        item_info.push_back({checkImageWidth1, checkImageHeight1, -1, 0.9375, 1, 1, TEX_MAT});
+        item_info.push_back({checkImageWidth2, checkImageHeight2, -1, -1, -0.94, 1, TEX_MAT});
+        item_info.push_back({checkImageWidth2, checkImageHeight2, 0.94, -1, 1, 1, TEX_MAT});
+    }
 
     glhelper_->register_item(item_info.size(), item_info);
 
@@ -73,6 +120,7 @@ void Pipeline::rstp_client_thread(Pipeline *pipe)
 void Pipeline::decode(Pipeline *pipe)
 {
     JmgpuVideoBufferInfo bufferInfo;
+    int firstNotDisplayNum = 3;
     // 无需显卡解码时
     if (!FLAGS_use_rtsp)
     {
@@ -94,19 +142,30 @@ void Pipeline::decode(Pipeline *pipe)
         if (videoBuffer)
         {
             jmgpuVideoBufferGetBufferInfo(videoBuffer, &bufferInfo);
-            // 如果rgbaQueue过长，需要pop
-            int queue_size = jmgpuConcurrentQueueSize(pipe->rgbaQueue);
-            while (queue_size > 3 && pipe->global_run_flag)
+            int64_t displayTime = bufferInfo.pts;
+            int64_t curTime = jmgpuCurrentTimeStamp();
+            int64_t delay = curTime - displayTime;
+            if ((firstNotDisplayNum > 0) || (delay > 20))
             {
-                // printf("pop: %d\n", queue_size);
-                LOG(INFO) << "pop" << queue_size;
-                JmgpuVideoBuffer videoBuffer_tmp = jmgpuConcurrentQueueFirst(pipe->rgbaQueue);
-                jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer_tmp);
-                queue_size = jmgpuConcurrentQueueSize(pipe->rgbaQueue);
+                jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer);
+                firstNotDisplayNum--;
             }
-            jmgpuConcurrentQueueAddData(pipe->rgbaQueue, videoBuffer, NULL);
-            // 通知接收解码结果线程
-            pipe->got_frame();
+            else
+            {
+                jmgpuConcurrentQueueAddData(pipe->rgbaQueue, videoBuffer, NULL);
+                // 通知接收解码结果线程
+                pipe->got_frame();
+            }
+        }
+        // 如果rgbaQueue过长，需要pop
+        int queue_size = jmgpuConcurrentQueueSize(pipe->rgbaQueue);
+        while (queue_size > 3 && pipe->global_run_flag)
+        {
+            // printf("pop: %d\n", queue_size);
+            LOG(INFO) << "pop" << queue_size;
+            JmgpuVideoBuffer videoBuffer_tmp = jmgpuConcurrentQueueFirst(pipe->rgbaQueue);
+            jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer_tmp);
+            queue_size = jmgpuConcurrentQueueSize(pipe->rgbaQueue);
         }
     }
 }
@@ -117,6 +176,17 @@ void Pipeline::got_detect_frame(cv::Mat &image)
     if (FLAGS_display_detect)
     {
         glhelper_->update_tex(1, image);
+    }
+    if (FLAGS_blend_more)
+    {
+        cv::Mat img1(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
+        cv::Mat img2(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
+        cv::Mat img3(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
+        cv::Mat img4(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
+        glhelper_->update_tex(2, img1);
+        glhelper_->update_tex(3, img2);
+        glhelper_->update_tex(4, img3);
+        glhelper_->update_tex(5, img4);
     }
 }
 

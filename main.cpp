@@ -8,6 +8,7 @@ DEFINE_bool(use_rtsp, true, "是否使用RTSP解码");
 DEFINE_bool(use_rtsp_for_npu, true, "是否将RTSP解码图像用于目标检测");
 DEFINE_bool(display_rtsp, true, "是否显示rtsp解码图像");
 DEFINE_bool(display_detect, true, "是否显示目标检测结果");
+DEFINE_bool(blend_more, false, "融合更多图层");
 DEFINE_string(source, "rtsp://192.168.50.203/live/av0", "rtsp源地址");
 
 std::shared_ptr<GLHelper> glhelper_;

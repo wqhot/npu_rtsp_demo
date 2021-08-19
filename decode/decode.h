@@ -15,7 +15,7 @@ typedef struct {
   JmgpuMediaCodec decode;
 } Decode;
 
-Decode* decodeCreate(JmgpuMediaContext context, int width, int height, uint32_t decProfile);
+Decode* decodeCreate(JmgpuMediaContext context);
 
 int  decodeInit(Decode *decode);
 void  decodeRelease(Decode *decode);

@@ -14,6 +14,7 @@ int64_t jmgpuCurrentTimeStamp(void);
 
 uint64_t jmgpuGetTime(void);
 
+int64_t jmgpuTimeToTimeStampMs(struct timeval tv);
 
 #ifdef __cplusplus
 }

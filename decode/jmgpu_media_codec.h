@@ -10,6 +10,7 @@ extern "C" {
 #include "jmgpu_media_context.h"
 #include "jmgpu_video_state.h"
 
+#define JMV_INVALID_VIDEO_SIZE 0
 
 typedef enum  
 {
@@ -25,8 +26,10 @@ typedef enum JmgpuMediaCodecMode {
 typedef struct JmgpuVideoParams {
 	JmgpuVideoDataFormat inputFormat;
 	JmgpuVideoDataFormat outputFormat;
-	unsigned int videoWidth;
-	unsigned int videoHeight;
+	unsigned int inputVideoWidth;
+	unsigned int inputVideoHeight;
+	unsigned int outputVideoWidth;
+	unsigned int outputVideoHeight;
 	JmgpuMediaCodecMode codecMode;
 	JmgpuDecodeMode decMode;
 	JmgpuDecoderProfile decProfile;

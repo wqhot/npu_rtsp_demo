@@ -4,6 +4,8 @@
 #include <BasicUsageEnvironment.hh>
 #include <H264VideoRTPSource.hh>
 
+#include <jmgpu_time.h>
+
 // Forward function definitions:
 
 // RTSP 'response handlers':
@@ -157,7 +159,7 @@ private:
     char *fStreamId;
 };
 
-#define RTSP_CLIENT_VERBOSITY_LEVEL 1 // by default, print verbose output from each "RTSPClient"
+#define RTSP_CLIENT_VERBOSITY_LEVEL 5 // by default, print verbose output from each "RTSPClient"
 
 static unsigned rtspClientCount = 0; // Counts how many streams (i.e., "RTSPClient"s) are currently in use.
 
@@ -607,25 +609,27 @@ void DummySink::afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes
         pos = pos + 4;
     }
 
-    int type = (fReceiveBuffer[0] & 0x1F);
-    if (type == 0x06 || type == 0x07 || type == 0x08)
-    {
-        int ret = checkBufHaveIDRFrame(fReceiveBuffer, frameSize, 0);
-        if (ret == 0)
-        {
-            memcpy(buffer + pos, fReceiveBuffer, frameSize);
-            pos = pos + frameSize;
-            continuePlaying();
-            // printf("-----return ----- \n");
-            return;
-        }
-    }
+    // int type = (fReceiveBuffer[0] & 0x1F);
+    // if (type == 0x06 || type == 0x07 || type == 0x08)
+    // {
+    //     int ret = checkBufHaveIDRFrame(fReceiveBuffer, frameSize, 0);
+    //     if (ret == 0)
+    //     {
+    //         memcpy(buffer + pos, fReceiveBuffer, frameSize);
+    //         pos = pos + frameSize;
+    //         continuePlaying();
+    //         // printf("-----return ----- \n");
+    //         return;
+    //     }
+    // }
     memcpy(buffer + pos, fReceiveBuffer, frameSize);
     pos = pos + frameSize;
     // printf("-----read ----pos : %d \n", pos);
     JmgpuVideoBuffer vbToDec = jmgpuMediaCodecDequeueInputBuffer(decode->decode, 0);
     JmgpuVideoBufferInfo bufferInfo;
     jmgpuVideoBufferGetBufferInfo(vbToDec, &bufferInfo);
+
+    bufferInfo.pts = jmgpuTimeToTimeStampMs(presentationTime);
 
     jmgpuVideoBufferSetBufferInfo(vbToDec, bufferInfo);
 
