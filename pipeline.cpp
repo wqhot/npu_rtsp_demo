@@ -8,7 +8,7 @@ DECLARE_bool(use_rtsp);
 DECLARE_bool(use_rtsp_for_npu);
 DECLARE_bool(display_rtsp);
 DECLARE_bool(display_detect);
-DECLARE_bool(blend_more);
+DECLARE_uint32(blend_more);
 
 static std::vector<unsigned char> img_data;
 #define checkImageWidth1 1920
@@ -72,13 +72,17 @@ Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_hel
     // 图层1为目标检测结果图层，纹理类型为opencv图像
     item_info.push_back({1920, 1080, -1, -1, 1, 1, TEX_MAT});
 
-    if (FLAGS_blend_more)
+    makeCheckImages();
+    for (uint32_t i = 0; i < FLAGS_blend_more; i++)
     {
-        makeCheckImages();
-        item_info.push_back({checkImageWidth1, checkImageHeight1, -1, -1, 1, -0.9375, TEX_MAT});
-        item_info.push_back({checkImageWidth1, checkImageHeight1, -1, 0.9375, 1, 1, TEX_MAT});
-        item_info.push_back({checkImageWidth2, checkImageHeight2, -1, -1, -0.94, 1, TEX_MAT});
-        item_info.push_back({checkImageWidth2, checkImageHeight2, 0.94, -1, 1, 1, TEX_MAT});
+        if (i % 2)
+        {
+            item_info.push_back({checkImageWidth1, checkImageHeight1, -1, -1 + 0.0625f * (i - 1) / 2 , 1, -0.9375f + 0.0625f * (i - 1) / 2, TEX_MAT});
+        }
+        else
+        {
+            item_info.push_back({checkImageWidth2, checkImageHeight2, -1 + 0.06f * i / 2, -1, -0.94f + 0.06f * i / 2, 1, TEX_MAT});
+        }
     }
 
     glhelper_->register_item(item_info.size(), item_info);
@@ -177,16 +181,18 @@ void Pipeline::got_detect_frame(cv::Mat &image)
     {
         glhelper_->update_tex(1, image);
     }
-    if (FLAGS_blend_more)
+    for (uint32_t i = 0; i < FLAGS_blend_more; i++)
     {
-        cv::Mat img1(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
-        cv::Mat img2(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
-        cv::Mat img3(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
-        cv::Mat img4(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
-        glhelper_->update_tex(2, img1);
-        glhelper_->update_tex(3, img2);
-        glhelper_->update_tex(4, img3);
-        glhelper_->update_tex(5, img4);
+        if (i % 2)
+        {
+            cv::Mat img(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
+            glhelper_->update_tex(2 + i, img);
+        }
+        else
+        {
+            cv::Mat img(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
+            glhelper_->update_tex(2 + i, img);
+        }
     }
 }
 

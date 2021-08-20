@@ -8,7 +8,7 @@ DEFINE_bool(use_rtsp, true, "是否使用RTSP解码");
 DEFINE_bool(use_rtsp_for_npu, true, "是否将RTSP解码图像用于目标检测");
 DEFINE_bool(display_rtsp, true, "是否显示rtsp解码图像");
 DEFINE_bool(display_detect, true, "是否显示目标检测结果");
-DEFINE_bool(blend_more, false, "融合更多图层");
+DEFINE_uint32(blend_more, 0, "融合图层数量");
 DEFINE_string(source, "rtsp://192.168.50.203/live/av0", "rtsp源地址");
 
 std::shared_ptr<GLHelper> glhelper_;
@@ -36,6 +36,13 @@ int main(int argc, char **argv)
     
     FLAGS_log_dir = "./";
     gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+    if (FLAGS_blend_more > 16)
+    {
+        printf("blend_more must be less than 17\n");
+        return 0;
+    }
+
     google::InitGoogleLogging(argv[0]);
 
     LOG(INFO) << "是否使用目标检测: " << FLAGS_use_npu;
