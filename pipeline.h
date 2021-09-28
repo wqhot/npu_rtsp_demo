@@ -31,13 +31,17 @@ private:
     static bool get_frame(Pipeline *pipe);
     static void decode(Pipeline *pipe);
     static void rstp_client_thread(Pipeline *pipe);
+    static void draw_blend_layer_thread(Pipeline *pipe);
     void got_detect_frame(cv::Mat &image);
     void got_frame();
+    void draw_blend_layer();
 
-    std::condition_variable cond_;
-    std::mutex mtx_;
+    std::condition_variable cond_, cond_draw_blend_layer;
+    std::mutex mtx_, mtx_draw_blend_layer;
     std::string url;
-    JSSDetectInterface interface;
+    // JSSDetectInterface interface;
+
+    std::unique_ptr<JSSDetectInterface> interface_ptr;
 
     JmgpuMediaContext context;
     Decode *decoder;

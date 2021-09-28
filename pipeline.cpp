@@ -48,9 +48,15 @@ void makeCheckImages(void)
 }
 
 Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_helper)
-    //加载目标检测模型文件，绑定回调函数
-    : interface("../model/model.cambricon", std::bind(&Pipeline::got_detect_frame, this, std::placeholders::_1))
+//加载目标检测模型文件，绑定回调函数
+// : interface("../model/model.cambricon", std::bind(&Pipeline::got_detect_frame, this, std::placeholders::_1))
 {
+    if (FLAGS_use_npu)
+    {
+        interface_ptr = std::make_unique<JSSDetectInterface>(
+            "../model/model.cambricon",
+            std::bind(&Pipeline::got_detect_frame, this, std::placeholders::_1));
+    }
     // 解码相关
     rows = 1080;
     cols = 1920;
@@ -77,7 +83,7 @@ Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_hel
     {
         if (i % 2)
         {
-            item_info.push_back({checkImageWidth1, checkImageHeight1, -1, -1 + 0.0625f * (i - 1) / 2 , 1, -0.9375f + 0.0625f * (i - 1) / 2, TEX_MAT});
+            item_info.push_back({checkImageWidth1, checkImageHeight1, -1, -1 + 0.0625f * (i - 1) / 2, 1, -0.9375f + 0.0625f * (i - 1) / 2, TEX_MAT});
         }
         else
         {
@@ -111,6 +117,19 @@ void Pipeline::start()
     // 接收解码结果线程
     std::thread refresh(get_frame, this);
     refresh.detach();
+    // 绘制融合线程
+    std::thread blend(draw_blend_layer_thread, this);
+    blend.detach();
+}
+
+void Pipeline::draw_blend_layer_thread(Pipeline *pipe)
+{
+    while (pipe->global_run_flag)
+    {
+        std::unique_lock<std::mutex> lock(pipe->mtx_draw_blend_layer);
+        pipe->cond_draw_blend_layer.wait(lock);
+        pipe->draw_blend_layer();
+    }
 }
 
 void Pipeline::rstp_client_thread(Pipeline *pipe)
@@ -174,13 +193,8 @@ void Pipeline::decode(Pipeline *pipe)
     }
 }
 
-// 目标检测回调
-void Pipeline::got_detect_frame(cv::Mat &image)
+void Pipeline::draw_blend_layer()
 {
-    if (FLAGS_display_detect)
-    {
-        glhelper_->update_tex(1, image);
-    }
     for (uint32_t i = 0; i < FLAGS_blend_more; i++)
     {
         if (i % 2)
@@ -193,6 +207,15 @@ void Pipeline::got_detect_frame(cv::Mat &image)
             cv::Mat img(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
             glhelper_->update_tex(2 + i, img);
         }
+    }
+}
+
+// 目标检测回调
+void Pipeline::got_detect_frame(cv::Mat &image)
+{
+    if (FLAGS_display_detect && FLAGS_use_npu)
+    {
+        glhelper_->update_tex(1, image);
     }
 }
 
@@ -231,8 +254,10 @@ bool Pipeline::get_frame(Pipeline *pipe)
                 }
                 if (FLAGS_use_npu)
                 {
-                    pipe->interface.push_image(gpu_mat, id++);
+                    // pipe->interface.push_image(gpu_mat, id++);
+                    pipe->interface_ptr->push_image(gpu_mat, id++);
                 }
+                pipe->cond_draw_blend_layer.notify_all();
                 // 等待前面的刷新结束后释放显存
                 pipe->glhelper_->wait_draw();
                 jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer);
@@ -244,7 +269,8 @@ bool Pipeline::get_frame(Pipeline *pipe)
             pipe->glhelper_->refresh();
             if (FLAGS_use_npu)
             {
-                pipe->interface.push_image(gpu_mat, id++);
+                // pipe->interface.push_image(gpu_mat, id++);
+                pipe->interface_ptr->push_image(gpu_mat, id++);
             }
         }
     }
