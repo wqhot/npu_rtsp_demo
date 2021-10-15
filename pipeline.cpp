@@ -62,7 +62,6 @@ Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_hel
     cols = 1920;
     if (FLAGS_use_rtsp)
     {
-        rgbaQueue = jmgpuConcurrentQueueCreate();
         context = jmgpuMediaContextCreate();
         decoder = decodeCreate(context);
         decodeStart(decoder);
@@ -115,11 +114,11 @@ void Pipeline::start()
     std::thread roll(decode, this);
     roll.detach();
     // 接收解码结果线程
-    std::thread refresh(get_frame, this);
-    refresh.detach();
-    // 绘制融合线程
-    std::thread blend(draw_blend_layer_thread, this);
-    blend.detach();
+    // std::thread refresh(get_frame, this);
+    // refresh.detach();
+    // // 绘制融合线程
+    // std::thread blend(draw_blend_layer_thread, this);
+    // blend.detach();
 }
 
 void Pipeline::draw_blend_layer_thread(Pipeline *pipe)
@@ -144,6 +143,9 @@ void Pipeline::decode(Pipeline *pipe)
 {
     JmgpuVideoBufferInfo bufferInfo;
     int firstNotDisplayNum = 3;
+    cv::Mat test_image = cv::imread("../video/0750.bmp");
+    cv::resize(test_image, test_image, cv::Size(1920, 1080));
+    unsigned long id = 0;
     // 无需显卡解码时
     if (!FLAGS_use_rtsp)
     {
@@ -160,36 +162,51 @@ void Pipeline::decode(Pipeline *pipe)
     }
     while (pipe->global_run_flag)
     {
-        int64_t curTimeStamp = jmgpuCurrentTimeStamp();
+        int64_t curTimeStamp = currentTimeStamp();
         JmgpuVideoBuffer videoBuffer = jmgpuMediaCodecDequeueOutputBuffer(pipe->decoder->decode, -1);
+        cv::Mat gpu_mat(cv::Size(pipe->cols, pipe->rows), CV_MAKE_TYPE(8, 4), cv::Scalar(0));
         if (videoBuffer)
         {
             jmgpuVideoBufferGetBufferInfo(videoBuffer, &bufferInfo);
             int64_t displayTime = bufferInfo.pts;
-            int64_t curTime = jmgpuCurrentTimeStamp();
+            int64_t curTime = currentTimeStamp();
             int64_t delay = curTime - displayTime;
-            if ((firstNotDisplayNum > 0) || (delay > 20))
+            if (FLAGS_use_rtsp_for_npu)
             {
-                jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer);
-                firstNotDisplayNum--;
+                jmgpuVideoBufferReadFb(videoBuffer, gpu_mat.data, pipe->cols * pipe->rows * 4);
             }
             else
             {
-                jmgpuConcurrentQueueAddData(pipe->rgbaQueue, videoBuffer, NULL);
-                // 通知接收解码结果线程
-                pipe->got_frame();
+                gpu_mat = test_image;
             }
         }
-        // 如果rgbaQueue过长，需要pop
-        int queue_size = jmgpuConcurrentQueueSize(pipe->rgbaQueue);
-        while (queue_size > 3 && pipe->global_run_flag)
+        for (uint32_t i = 0; i < FLAGS_blend_more; i++)
         {
-            // printf("pop: %d\n", queue_size);
-            LOG(INFO) << "pop" << queue_size;
-            JmgpuVideoBuffer videoBuffer_tmp = jmgpuConcurrentQueueFirst(pipe->rgbaQueue);
-            jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer_tmp);
-            queue_size = jmgpuConcurrentQueueSize(pipe->rgbaQueue);
+            if (i % 2)
+            {
+                cv::Mat img(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
+                pipe->glhelper_->update_tex(2 + i, img);
+            }
+            else
+            {
+                cv::Mat img(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
+                pipe->glhelper_->update_tex(2 + i, img);
+            }
         }
+        if (FLAGS_use_npu)
+        {
+            pipe->interface_ptr->push_image(gpu_mat, id++);
+        }
+
+        if (FLAGS_display_rtsp)
+        {
+            pipe->glhelper_->update_gpu_tex(0, &videoBuffer);
+        }
+
+        pipe->glhelper_->refresh();
+
+        // 等待前面的刷新结束后释放显存
+        pipe->glhelper_->wait_draw();
     }
 }
 
@@ -231,7 +248,7 @@ bool Pipeline::get_frame(Pipeline *pipe)
         printf("refresh\n");
         if (FLAGS_use_rtsp)
         {
-            JmgpuVideoBuffer videoBuffer = jmgpuConcurrentQueueFirst(pipe->rgbaQueue);
+            JmgpuVideoBuffer videoBuffer = pipe->rgbaQueue.first();
             if (videoBuffer)
             {
                 JmgpuVideoBufferInfo bufferInfo;
@@ -239,7 +256,7 @@ bool Pipeline::get_frame(Pipeline *pipe)
                 // 更新opengl纹理，开始异步刷新
                 if (FLAGS_display_rtsp)
                 {
-                    pipe->glhelper_->update_tex(0, &videoBuffer);
+                    pipe->glhelper_->update_gpu_tex(0, &videoBuffer);
                 }
                 pipe->glhelper_->refresh();
                 cv::Mat gpu_mat(cv::Size(pipe->cols, pipe->rows), CV_MAKE_TYPE(8, 4), cv::Scalar(0));

@@ -2,10 +2,10 @@
 
 #include <mwv206api.h>
 
-#include <jmgpu_concurrent_queue.h>
+
 #include <jmgpu_media_context.h>
 #include <jmgpu_media_codec.h>
-#include <jmgpu_time.h>
+
 #include <decode.h>
 #include <rtsp_client.h>
 #include <glhelper.h>
@@ -16,6 +16,7 @@
 #include <vector>
 #include <opencv4/opencv2/opencv.hpp>
 #include <detect_interface.h>
+#include <decode/concurrent_queue.h>
 
 class Pipeline
 {
@@ -45,7 +46,7 @@ private:
 
     JmgpuMediaContext context;
     Decode *decoder;
-    JmgpuConcurrentQueue *rgbaQueue;
+    ConcurrentQueue<JmgpuVideoBuffer> rgbaQueue;
     bool global_run_flag;
 };
 

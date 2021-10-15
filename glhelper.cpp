@@ -70,7 +70,7 @@ void GLHelper::refresh()
     refresh_cond_.notify_one();
 }
 
-void GLHelper::update_tex(int tex_index, JmgpuVideoBuffer* ptr)
+void GLHelper::update_gpu_tex(int tex_index, JmgpuVideoBuffer* ptr)
 {
     std::unique_lock<std::mutex> lock(mtx_);
     tex_gpu_[tex_index] = ptr;

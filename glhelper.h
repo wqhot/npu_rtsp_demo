@@ -49,7 +49,7 @@ public:
 
     void update_tex(int tex_index, void* ptr);
 
-    void update_tex(int tex_index, JmgpuVideoBuffer* ptr);
+    void update_gpu_tex(int tex_index, JmgpuVideoBuffer* ptr);
 
     void update_tex(int tex_index, cv::Mat &data);
 
