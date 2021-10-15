@@ -25,6 +25,9 @@ void decodeStop(Decode *decode);
 
 int startRtspClientNew(Decode *decode, const char* url);
 
+int64_t currentTimeStamp(void);
+int64_t timeToTimeStampMs(struct timeval tv);
+
 #ifdef __cplusplus
 }
 #endif

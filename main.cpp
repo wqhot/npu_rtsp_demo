@@ -32,7 +32,7 @@ static void display()
 int main(int argc, char **argv)
 {
     setenv("MWV206_GLVERSION", "1", 1);
-    setenv("MWV206_HW_DEC", "1", 1);
+    // setenv("MWV206_HW_DEC", "1", 1);
     
     FLAGS_log_dir = "./";
     gflags::ParseCommandLineFlags(&argc, &argv, true);

@@ -1,10 +1,7 @@
-#include <rtsp_client.h>
+#include <decode/rtsp_client.h>
 
-#include <liveMedia.hh>
-#include <BasicUsageEnvironment.hh>
-#include <H264VideoRTPSource.hh>
 
-#include <jmgpu_time.h>
+
 
 // Forward function definitions:
 
@@ -159,7 +156,7 @@ private:
     char *fStreamId;
 };
 
-#define RTSP_CLIENT_VERBOSITY_LEVEL 5 // by default, print verbose output from each "RTSPClient"
+#define RTSP_CLIENT_VERBOSITY_LEVEL 1 // by default, print verbose output from each "RTSPClient"
 
 static unsigned rtspClientCount = 0; // Counts how many streams (i.e., "RTSPClient"s) are currently in use.
 
@@ -629,7 +626,7 @@ void DummySink::afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes
     JmgpuVideoBufferInfo bufferInfo;
     jmgpuVideoBufferGetBufferInfo(vbToDec, &bufferInfo);
 
-    bufferInfo.pts = jmgpuTimeToTimeStampMs(presentationTime);
+    bufferInfo.pts = timeToTimeStampMs(presentationTime);
 
     jmgpuVideoBufferSetBufferInfo(vbToDec, bufferInfo);
 
