@@ -74,8 +74,7 @@ add_library(decode
 )
 
 target_link_libraries(decode
-    mwv206api
-    mwv206dec
+    jmgpumediacodec
     liveMedia
     groupsock
     BasicUsageEnvironment

@@ -47,7 +47,7 @@
                 }
             ],
             "miDebuggerPath": "/home/wang/libs/cross/install/bin/aarch64-linux-gnu-gdb",
-            "miDebuggerServerAddress": "192.168.50.211:2000"
+            "miDebuggerServerAddress": "192.168.50.101:2000"
         },
     ]
 }
