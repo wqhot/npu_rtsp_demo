@@ -47,7 +47,7 @@ void makeCheckImages(void)
     }
 }
 
-Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_helper)
+Pipeline::Pipeline(std::string camera_address, std::shared_ptr<DisplayHelper> &display_helper)
 //加载目标检测模型文件，绑定回调函数
 // : interface("../model/model.cambricon", std::bind(&Pipeline::got_detect_frame, this, std::placeholders::_1))
 {
@@ -67,7 +67,7 @@ Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_hel
         decodeStart(decoder);
     }
     url = camera_address;
-    glhelper_ = gl_helper;
+    displaylhelper_ = display_helper;
     global_run_flag = true;
 
     // 注册opengl显示图层
@@ -90,7 +90,7 @@ Pipeline::Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_hel
         }
     }
 
-    glhelper_->register_item(item_info.size(), item_info);
+    displaylhelper_->register_item(item_info.size(), item_info);
 
     return;
 }
@@ -114,8 +114,8 @@ void Pipeline::start()
     std::thread roll(decode, this);
     roll.detach();
     // 接收解码结果线程
-    // std::thread refresh(get_frame, this);
-    // refresh.detach();
+    std::thread refresh(get_frame, this);
+    refresh.detach();
     // // 绘制融合线程
     // std::thread blend(draw_blend_layer_thread, this);
     // blend.detach();
@@ -171,7 +171,7 @@ void Pipeline::decode(Pipeline *pipe)
             int64_t displayTime = bufferInfo.pts;
             int64_t curTime = currentTimeStamp();
             int64_t delay = curTime - displayTime;
-            if (FLAGS_use_rtsp_for_npu)
+            if (FLAGS_use_rtsp_for_npu || FLAGS_display_rtsp)
             {
                 jmgpuVideoBufferReadFb(videoBuffer, gpu_mat.data, pipe->cols * pipe->rows * 4);
             }
@@ -185,12 +185,12 @@ void Pipeline::decode(Pipeline *pipe)
             if (i % 2)
             {
                 cv::Mat img(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
-                pipe->glhelper_->update_tex(2 + i, img);
+                pipe->displaylhelper_->update_tex(2 + i, img);
             }
             else
             {
                 cv::Mat img(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
-                pipe->glhelper_->update_tex(2 + i, img);
+                pipe->displaylhelper_->update_tex(2 + i, img);
             }
         }
         if (FLAGS_use_npu)
@@ -200,13 +200,13 @@ void Pipeline::decode(Pipeline *pipe)
 
         if (FLAGS_display_rtsp)
         {
-            pipe->glhelper_->update_gpu_tex(0, &videoBuffer);
+            pipe->displaylhelper_->update_tex(0, gpu_mat);
         }
 
-        pipe->glhelper_->refresh();
+        pipe->displaylhelper_->refresh();
 
         // 等待前面的刷新结束后释放显存
-        pipe->glhelper_->wait_draw();
+        pipe->displaylhelper_->wait_draw();
     }
 }
 
@@ -217,12 +217,12 @@ void Pipeline::draw_blend_layer()
         if (i % 2)
         {
             cv::Mat img(cv::Size(checkImageWidth1, checkImageHeight1), CV_MAKETYPE(8, 4), otherImage);
-            glhelper_->update_tex(2 + i, img);
+            displaylhelper_->update_tex(2 + i, img);
         }
         else
         {
             cv::Mat img(cv::Size(checkImageWidth2, checkImageHeight2), CV_MAKETYPE(8, 4), otherImage2);
-            glhelper_->update_tex(2 + i, img);
+            displaylhelper_->update_tex(2 + i, img);
         }
     }
 }
@@ -232,7 +232,7 @@ void Pipeline::got_detect_frame(cv::Mat &image)
 {
     if (FLAGS_display_detect && FLAGS_use_npu)
     {
-        glhelper_->update_tex(1, image);
+        displaylhelper_->update_tex(1, image);
     }
 }
 
@@ -256,9 +256,9 @@ bool Pipeline::get_frame(Pipeline *pipe)
                 // 更新opengl纹理，开始异步刷新
                 if (FLAGS_display_rtsp)
                 {
-                    pipe->glhelper_->update_gpu_tex(0, &videoBuffer);
+                    pipe->displaylhelper_->update_gpu_tex(0, &videoBuffer);
                 }
-                pipe->glhelper_->refresh();
+                pipe->displaylhelper_->refresh();
                 cv::Mat gpu_mat(cv::Size(pipe->cols, pipe->rows), CV_MAKE_TYPE(8, 4), cv::Scalar(0));
                 // 复制到内存，并发送到目标检测接收区
                 if (FLAGS_use_rtsp_for_npu)
@@ -276,19 +276,23 @@ bool Pipeline::get_frame(Pipeline *pipe)
                 }
                 pipe->cond_draw_blend_layer.notify_all();
                 // 等待前面的刷新结束后释放显存
-                pipe->glhelper_->wait_draw();
+                pipe->displaylhelper_->wait_draw();
                 jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer);
             }
         }
         else
         {
             cv::Mat gpu_mat = test_image;
-            pipe->glhelper_->refresh();
+            pipe->displaylhelper_->refresh();
             if (FLAGS_use_npu)
             {
                 // pipe->interface.push_image(gpu_mat, id++);
                 pipe->interface_ptr->push_image(gpu_mat, id++);
             }
+            pipe->draw_blend_layer();
+            pipe->displaylhelper_->refresh();
+            // 等待前面的刷新结束后释放显存
+            pipe->displaylhelper_->wait_draw();
         }
     }
 

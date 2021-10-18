@@ -1,4 +1,6 @@
 #include "glhelper.h"
+#include <displayhelper.h>
+#include <fbhelper.h>
 #include <glog/logging.h>
 #include <pipeline.h>
 #include <gflags/gflags.h>
@@ -8,25 +10,26 @@ DEFINE_bool(use_rtsp, true, "是否使用RTSP解码");
 DEFINE_bool(use_rtsp_for_npu, true, "是否将RTSP解码图像用于目标检测");
 DEFINE_bool(display_rtsp, true, "是否显示rtsp解码图像");
 DEFINE_bool(display_detect, true, "是否显示目标检测结果");
+DEFINE_bool(framebuffer, false, "使用framebuffer而不是opengl进行显示");
 DEFINE_uint32(blend_more, 0, "融合图层数量");
 DEFINE_string(source, "rtsp://192.168.50.203/live/av0", "rtsp源地址");
 
-std::shared_ptr<GLHelper> glhelper_;
+std::shared_ptr<DisplayHelper> displayhelper_;
 
 void loop(int)
 {
-    glhelper_->wait_refresh();
+    displayhelper_->wait_refresh();
     glutTimerFunc(0, loop, 0);
 };
 
 static void reshape(int w, int h)
 {
-    glhelper_->resize_gl(w, h);
+    displayhelper_->resize_gl(w, h);
 }
 
 static void display()
 {
-    glhelper_->wait_refresh();
+    displayhelper_->wait_refresh();
 }
 
 int main(int argc, char **argv)
@@ -53,16 +56,34 @@ int main(int argc, char **argv)
 
 
     // 初始化opengl显示界面
-    glutInit(&argc, argv);
-    glhelper_ = std::make_shared<GLHelper>();
+    if (FLAGS_framebuffer)
+    {
+        displayhelper_ = std::make_shared<FramebufferHelper>();
+    }
+    else
+    {
+        glutInit(&argc, argv);
+        displayhelper_ = std::make_shared<GLHelper>();
+    }
+    
 
     // 用于管理接收到的图像并发送到目标检测接口中与opengl显示
-    Pipeline pipe(FLAGS_source, glhelper_);
+    Pipeline pipe(FLAGS_source, displayhelper_);
     pipe.start();
 
-    glutReshapeFunc(reshape);
-    glutDisplayFunc(display);
-    glutTimerFunc(0, loop, 0);
-    glutMainLoop();
+    if (!FLAGS_framebuffer)
+    {
+        glutReshapeFunc(reshape);
+        glutDisplayFunc(display);
+        glutTimerFunc(0, loop, 0);
+        glutMainLoop();
+    }
+    else
+    {
+        while(1)
+        {
+            sleep(1);
+        }
+    }
     return 0;
 }

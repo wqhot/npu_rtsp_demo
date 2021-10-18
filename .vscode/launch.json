@@ -30,10 +30,10 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/gltest",
-            "args": [
-                "../video/",
-                "-gtk"
-            ],
+            // "args": [
+            //     "../video/",
+            //     "-gtk"
+            // ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
@@ -47,7 +47,7 @@
                 }
             ],
             "miDebuggerPath": "/home/wang/libs/cross/install/bin/aarch64-linux-gnu-gdb",
-            "miDebuggerServerAddress": "192.168.50.205:2000"
+            "miDebuggerServerAddress": "192.168.50.211:2000"
         },
     ]
 }

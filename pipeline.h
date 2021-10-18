@@ -16,19 +16,20 @@
 #include <vector>
 #include <opencv4/opencv2/opencv.hpp>
 #include <detect_interface.h>
+#include <displayhelper.h>
 #include <decode/concurrent_queue.h>
 
 class Pipeline
 {
 public:
-    Pipeline(std::string camera_address, std::shared_ptr<GLHelper> &gl_helper);
+    Pipeline(std::string camera_address, std::shared_ptr<DisplayHelper> &gl_helper);
     ~Pipeline();
     void start();
 
 private:
     int rows;
     int cols;
-    std::shared_ptr<GLHelper> glhelper_;
+    std::shared_ptr<DisplayHelper> displaylhelper_;
     static bool get_frame(Pipeline *pipe);
     static void decode(Pipeline *pipe);
     static void rstp_client_thread(Pipeline *pipe);

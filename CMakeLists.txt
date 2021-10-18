@@ -59,6 +59,7 @@ link_directories(
 
 add_library(glhelper
     glhelper.cpp
+    fbhelper.cpp
 )
 
 target_link_libraries(glhelper
