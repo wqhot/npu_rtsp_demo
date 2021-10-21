@@ -1,6 +1,8 @@
 #include <fbhelper.h>
 #include <glog/logging.h>
 #include <thread>
+#include <sstream>
+#include <string>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -42,7 +44,11 @@ void FramebufferHelper::cp2fb(cv::Mat &image)
         size_t start_pos_screen = (fb_->line_length * i);
         size_t start_pos_image = (image.cols * i) * fb_->bpp;
         memcpy(fb_->data + start_pos_screen, image.data + start_pos_image, max_cols * fb_->bpp);
+        // printf("write done.\n");
+        // memcpy(image.data + start_pos_image, fb_->data + start_pos_screen, max_cols * fb_->bpp);
+        // printf("read done.\n");
     }
+    
 }
 
 void FramebufferHelper::linux_fb_close()
@@ -145,6 +151,10 @@ void FramebufferHelper::linux_fb_open(const char *filename)
     LOG(INFO) << "line_length=" << fix.line_length;
     LOG(INFO) << "xres_virtual=" << var.xres_virtual << " yres_virtual=" << var.yres_virtual
               << " xpanstep=" << fix.xpanstep << " ywrapstep=" << fix.ywrapstep;
+    // std::stringstream fmt;
+    // std::stringstream ffmt;
+    // fmt << "mmap address=" << std::hex << fb_->data;
+    // LOG(INFO) << fmt.str();
 
     return;
 fail:
@@ -264,7 +274,7 @@ void FramebufferHelper::paint_gl()
 
         // printf("painting %d...\n", i);
     }
-    printf("paint over\n");
+    // printf("paint over\n");
     lock.unlock();
     cp2fb(img);
     now_stamp = get_current_time();

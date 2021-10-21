@@ -8,6 +8,7 @@ DECLARE_bool(use_rtsp);
 DECLARE_bool(use_rtsp_for_npu);
 DECLARE_bool(display_rtsp);
 DECLARE_bool(display_detect);
+DECLARE_bool(framebuffer);
 DECLARE_uint32(blend_more);
 
 static std::vector<unsigned char> img_data;
@@ -171,7 +172,7 @@ void Pipeline::decode(Pipeline *pipe)
             int64_t displayTime = bufferInfo.pts;
             int64_t curTime = currentTimeStamp();
             int64_t delay = curTime - displayTime;
-            if (FLAGS_use_rtsp_for_npu || FLAGS_display_rtsp)
+            if (FLAGS_use_rtsp_for_npu || (FLAGS_display_rtsp && FLAGS_framebuffer))
             {
                 jmgpuVideoBufferReadFb(videoBuffer, gpu_mat.data, pipe->cols * pipe->rows * 4);
             }
@@ -200,13 +201,21 @@ void Pipeline::decode(Pipeline *pipe)
 
         if (FLAGS_display_rtsp)
         {
-            pipe->displaylhelper_->update_tex(0, gpu_mat);
+            if (FLAGS_framebuffer)
+            {
+                pipe->displaylhelper_->update_tex(0, gpu_mat);
+            }
+            else
+            {
+                pipe->displaylhelper_->update_gpu_tex(0, &videoBuffer);
+            }
         }
 
         pipe->displaylhelper_->refresh();
 
         // 等待前面的刷新结束后释放显存
         pipe->displaylhelper_->wait_draw();
+        jmgpuMediaCodecReleaseOutputBuffer(pipe->decoder->decode, videoBuffer);
     }
 }
 
