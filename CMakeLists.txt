@@ -46,10 +46,14 @@ include_directories(
         ${PROJECT_SOURCE_DIR}/decode
         ${OpenCV_INCLUDE_DIRS}
         ${CMAKE_FIND_ROOT_PATH}/include
-        ${CMAKE_FIND_ROOT_PATH}/include/liveMedia
-        ${CMAKE_FIND_ROOT_PATH}/include/BasicUsageEnvironment
-        ${CMAKE_FIND_ROOT_PATH}/include/UsageEnvironment
-        ${CMAKE_FIND_ROOT_PATH}/include/groupsock
+        ${PROJECT_SOURCE_DIR}/decode/live/liveMedia/include
+        ${PROJECT_SOURCE_DIR}/decode/live/BasicUsageEnvironment/include
+        ${PROJECT_SOURCE_DIR}/decode/live/UsageEnvironment/include
+        ${PROJECT_SOURCE_DIR}/decode/live/groupsock/include
+        # ${CMAKE_FIND_ROOT_PATH}/include/liveMedia
+        # ${CMAKE_FIND_ROOT_PATH}/include/BasicUsageEnvironment
+        # ${CMAKE_FIND_ROOT_PATH}/include/UsageEnvironment
+        # ${CMAKE_FIND_ROOT_PATH}/include/groupsock
 )
 
 link_directories(
